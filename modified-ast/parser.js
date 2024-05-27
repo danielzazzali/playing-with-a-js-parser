@@ -2,11 +2,13 @@ const esprima = require('esprima');
 const astring = require('astring');
 const fs = require('fs');
 const { exec } = require('child_process');
+const {promisify} = require('node:util');
 
 const code = fs.readFileSync('insertCodeExample.js', 'utf8');
 
 const ast = esprima.parseScript(code, { jsx: true });
 
+// Esto inserta la función externa en el código, al inicio del archivo
 function insertExternalFunction(ast, functionName) {
     ast.body.unshift({
         type: 'FunctionDeclaration',
@@ -20,7 +22,7 @@ function insertExternalFunction(ast, functionName) {
                     expression: {
                         type: 'CallExpression',
                         callee: { type: 'MemberExpression', object: { type: 'Identifier', name: 'console' }, property: { type: 'Identifier', name: 'log' }, computed: false },
-                        arguments: [{ type: 'Literal', value: 'External function called before greet method' }]
+                        arguments: [{ type: 'Literal', value: 'THIS IS NEW CODE INSERTED IN THE AST!' }]
                     }
                 }
             ]
@@ -31,6 +33,7 @@ function insertExternalFunction(ast, functionName) {
     });
 }
 
+// Esto inserta la llamada a la función externa en el método greet de la clase Greeter
 function insertExternalFunctionCallInGreet(ast, functionName) {
     ast.body.forEach(node => {
         if (node.type === 'ClassDeclaration' && node.id.name === 'Greeter') {
@@ -61,31 +64,36 @@ console.log('Modified AST:\n', JSON.stringify(ast, null, 2));
 console.log('Modified Code:\n', astring.generate(ast));
 
 const modifiedCode = astring.generate(ast);
-fs.writeFileSync('modified.js', modifiedCode);
+fs.writeFileSync('insertCodeExampleModified.js', modifiedCode);
 
-console.log('Executing Original Code:');
-fs.writeFileSync('original.js', code);
-exec('node original.js', (error, stdout, stderr) => {
-    if (error) {
-        console.error(`Error executing original code: ${error.message}`);
-        return;
-    }
-    if (stderr) {
-        console.error(`Error: ${stderr}`);
-        return;
-    }
-    console.log(stdout);
+const execPromise = promisify(exec);
 
-    console.log('Executing Modified Code:');
-    exec('node modified.js', (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error executing modified code: ${error.message}`);
-            return;
+(async () => {
+    try {
+        console.log('Executing Original Code:');
+        console.log('-----------------------------------------\n');
+
+        const { stdout: stdoutOriginal, stderr: stderrOriginal } = await execPromise('node insertCodeExample.js');
+
+        if (stderrOriginal) {
+            console.error(`Error: ${stderrOriginal}`);
+        } else {
+            console.log(stdoutOriginal);
         }
-        if (stderr) {
-            console.error(`Error: ${stderr}`);
-            return;
+
+
+
+        console.log('Executing Modified Code:');
+        console.log('-----------------------------------------\n');
+
+        const { stdout: stdoutModified, stderr: stderrModified } = await execPromise('node insertCodeExampleModified.js');
+
+        if (stderrModified) {
+            console.error(`Error: ${stderrModified}`);
+        } else {
+            console.log(stdoutModified);
         }
-        console.log(stdout);
-    });
-});
+    } catch (error) {
+        console.error(`Error executing code: ${error.message}`);
+    }
+})();

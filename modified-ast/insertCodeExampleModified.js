@@ -1,5 +1,5 @@
 function externalFunction() {
-  console.log("External function called before greet method");
+  console.log("THIS IS NEW CODE INSERTED IN THE AST!");
 }
 class Greeter {
   constructor(name) {
